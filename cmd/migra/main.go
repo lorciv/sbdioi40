@@ -25,15 +25,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	apps, err := plat.ListApplications()
+	app, err := plat.Application("carpi")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, app := range apps {
-		fmt.Println(app)
+	snap, err := plat.Snapshot(&app)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	fmt.Println(plat.Application("carpi"))
-	fmt.Println(plat.Application("sacmi"))
+	fmt.Println(snap)
 }
