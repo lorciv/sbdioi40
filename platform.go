@@ -65,7 +65,8 @@ func (p *Platform) ListApplications() ([]Application, error) {
 		}
 
 		for _, port := range allPorts {
-			if !strings.HasPrefix(port.Name, application.Name) {
+			if port.DeviceOwner != "compute:nova" {
+				// skip non-vm ports (such as dhcp)
 				continue
 			}
 			application.Services = append(application.Services, Service{
@@ -79,6 +80,52 @@ func (p *Platform) ListApplications() ([]Application, error) {
 	}
 
 	return applications, nil
+}
+
+func (p *Platform) Application(name string) (Application, error) {
+	neutron, err := openstack.NewNetworkV2(p.client, gophercloud.EndpointOpts{
+		Availability: gophercloud.AvailabilityPublic,
+	})
+	if err != nil {
+		return Application{}, err
+	}
+
+	// get the network
+	netID, err := networks.IDFromName(neutron, name+"net")
+	if err != nil {
+		return Application{}, err
+	}
+
+	application := Application{
+		Name:      name,
+		networkID: netID,
+	}
+
+	// get the ports
+	page, err := ports.List(neutron, ports.ListOpts{
+		NetworkID: netID,
+	}).AllPages()
+	if err != nil {
+		return Application{}, err
+	}
+	allPorts, err := ports.ExtractPorts(page)
+	if err != nil {
+		return Application{}, err
+	}
+
+	for _, port := range allPorts {
+		if port.DeviceOwner != "compute:nova" {
+			// skip non-vm ports (such as dhcp)
+			continue
+		}
+		application.Services = append(application.Services, Service{
+			Name:     trimPrefixSuffix(port.Name, application.Name, "port"),
+			portID:   port.ID,
+			serverID: port.DeviceID,
+		})
+	}
+
+	return application, nil
 }
 
 func trimPrefixSuffix(s string, prefix string, suffix string) string {
