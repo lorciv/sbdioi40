@@ -33,4 +33,7 @@ func main() {
 	for _, app := range apps {
 		fmt.Println(app)
 	}
+
+	fmt.Println(plat.Application("carpi"))
+	fmt.Println(plat.Application("sacmi"))
 }
