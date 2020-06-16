@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 
 	"github.com/lorciv/sbdioi40"
@@ -25,15 +24,33 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app, err := plat.Application("carpi")
+	log.Print("connected successfully to ", plat)
+
+	apps, err := plat.ListApplications()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Print(apps)
+
+	app, err := plat.Application("sacmi")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print(app)
 
 	snap, err := plat.Snapshot(&app)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(snap)
+	log.Print(snap)
+
+	dir, err := plat.Download(snap)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print(snap, " saved in ", dir)
 }

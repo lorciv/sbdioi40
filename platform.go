@@ -1,12 +1,14 @@
 package sbdioi40
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	networkutils "github.com/gophercloud/utils/openstack/networking/v2/networks"
 )
 
 func Connect(url, user, pass string) (*Platform, error) {
@@ -26,6 +28,10 @@ func Connect(url, user, pass string) (*Platform, error) {
 
 type Platform struct {
 	client *gophercloud.ProviderClient
+}
+
+func (p *Platform) String() string {
+	return "platform " + p.client.IdentityBase
 }
 
 func (p *Platform) ListApplications() ([]Application, error) {
@@ -87,13 +93,14 @@ func (p *Platform) Application(name string) (Application, error) {
 		Availability: gophercloud.AvailabilityPublic,
 	})
 	if err != nil {
-		return Application{}, err
+		return Application{}, fmt.Errorf("neutron connection failed: %v", err)
 	}
 
 	// get the network
-	netID, err := networks.IDFromName(neutron, name+"net")
+	netName := name + "net"
+	netID, err := networkutils.IDFromName(neutron, netName)
 	if err != nil {
-		return Application{}, err
+		return Application{}, fmt.Errorf("could not find network %s: %v", netName, err)
 	}
 
 	application := Application{
