@@ -11,6 +11,8 @@ import (
 	networkutils "github.com/gophercloud/utils/openstack/networking/v2/networks"
 )
 
+// Connect connects to an OpenStack platform within the SBDIOI40 project by using
+// the given credentials.
 func Connect(url, user, pass string) (*Platform, error) {
 	osClient, err := openstack.AuthenticatedClient(gophercloud.AuthOptions{
 		IdentityEndpoint: url,
@@ -26,6 +28,8 @@ func Connect(url, user, pass string) (*Platform, error) {
 	return &Platform{client: osClient}, nil
 }
 
+// Platform represents an established connection to an OpenStack platform within
+// the sbdioi40 project.
 type Platform struct {
 	client *gophercloud.ProviderClient
 }
@@ -34,6 +38,7 @@ func (p *Platform) String() string {
 	return "platform " + p.client.IdentityBase
 }
 
+// ListApplications lists the sbdioi40 applications currently hosted by the platform.
 func (p *Platform) ListApplications() ([]Application, error) {
 	neutron, err := openstack.NewNetworkV2(p.client, gophercloud.EndpointOpts{
 		Availability: gophercloud.AvailabilityPublic,
@@ -88,6 +93,7 @@ func (p *Platform) ListApplications() ([]Application, error) {
 	return applications, nil
 }
 
+// Application gets information about a specific application hosted by the platform.
 func (p *Platform) Application(name string) (Application, error) {
 	neutron, err := openstack.NewNetworkV2(p.client, gophercloud.EndpointOpts{
 		Availability: gophercloud.AvailabilityPublic,
@@ -100,12 +106,7 @@ func (p *Platform) Application(name string) (Application, error) {
 	netName := name + "net"
 	netID, err := networkutils.IDFromName(neutron, netName)
 	if err != nil {
-		return Application{}, fmt.Errorf("could not find network %s: %v", netName, err)
-	}
-
-	application := Application{
-		Name:      name,
-		networkID: netID,
+		return Application{}, fmt.Errorf("application %s does not exist", name)
 	}
 
 	// get the ports
@@ -120,19 +121,23 @@ func (p *Platform) Application(name string) (Application, error) {
 		return Application{}, err
 	}
 
+	app := Application{
+		Name:      name,
+		networkID: netID,
+	}
 	for _, port := range allPorts {
 		if port.DeviceOwner != "compute:nova" {
 			// skip non-vm ports (such as dhcp)
 			continue
 		}
-		application.Services = append(application.Services, Service{
-			Name:     trimPrefixSuffix(port.Name, application.Name, "port"),
+		app.Services = append(app.Services, Service{
+			Name:     trimPrefixSuffix(port.Name, app.Name, "port"),
 			portID:   port.ID,
 			serverID: port.DeviceID,
 		})
 	}
 
-	return application, nil
+	return app, nil
 }
 
 func trimPrefixSuffix(s string, prefix string, suffix string) string {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// Application holds information about a sbdioi40 application.
 type Application struct {
 	Name      string
 	networkID string
@@ -14,6 +15,7 @@ func (a Application) String() string {
 	return fmt.Sprintf("application %q with %s", a.Name, a.Services)
 }
 
+// Service holds information about a virtual machine that belongs to an application.
 type Service struct {
 	Name     string
 	portID   string

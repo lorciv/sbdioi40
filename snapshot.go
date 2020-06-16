@@ -16,6 +16,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 )
 
+// Snapshot is a remote snapshot of a sbdioi40 application.
 type Snapshot struct {
 	App       *Application
 	images    []serviceSnapshot
@@ -31,6 +32,8 @@ type serviceSnapshot struct {
 	imageID string
 }
 
+// Snapshot creates a snapshot of the given application and returns a Snapshot
+// object that holds information about it.
 func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
 	nova, err := openstack.NewComputeV2(p.client, gophercloud.EndpointOpts{
 		Availability: gophercloud.AvailabilityPublic,
@@ -64,6 +67,8 @@ func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
 	return snap, nil
 }
 
+// Download downlads a snapshot to the local storage. It returns the location of
+// the temporary directory where the data can be found.
 func (p *Platform) Download(snap Snapshot) (string, error) {
 	glance, err := openstack.NewImageServiceV2(p.client, gophercloud.EndpointOpts{
 		Availability: gophercloud.AvailabilityPublic,
