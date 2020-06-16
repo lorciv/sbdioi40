@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
@@ -35,13 +33,6 @@ type serviceSnapshot struct {
 // Snapshot creates a snapshot of the given application and returns a Snapshot
 // object that holds information about it.
 func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
-	nova, err := openstack.NewComputeV2(p.client, gophercloud.EndpointOpts{
-		Availability: gophercloud.AvailabilityPublic,
-	})
-	if err != nil {
-		return Snapshot{}, err
-	}
-
 	snap := Snapshot{
 		App:       app,
 		CreatedAt: time.Now(),
@@ -50,7 +41,7 @@ func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
 	for _, serv := range app.Services {
 		serv := serv // necessary: capture iteration variable
 
-		imageID, err := servers.CreateImage(nova, serv.serverID, servers.CreateImageOpts{
+		imageID, err := servers.CreateImage(p.nova, serv.serverID, servers.CreateImageOpts{
 			Name: app.Name + serv.Name + "snap",
 		}).ExtractImageID()
 		if err != nil {
@@ -70,13 +61,6 @@ func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
 // Download downlads a snapshot to the local storage. It returns the location of
 // the temporary directory where the data can be found.
 func (p *Platform) Download(snap Snapshot) (string, error) {
-	glance, err := openstack.NewImageServiceV2(p.client, gophercloud.EndpointOpts{
-		Availability: gophercloud.AvailabilityPublic,
-	})
-	if err != nil {
-		return "", err
-	}
-
 	dir, err := ioutil.TempDir("", "sbdioi40-snap-"+snap.App.Name)
 	if err != nil {
 		return "", err
@@ -87,12 +71,12 @@ func (p *Platform) Download(snap Snapshot) (string, error) {
 			return "", err
 		}
 
-		reader, err := imagedata.Download(glance, img.imageID).Extract()
+		reader, err := imagedata.Download(p.glance, img.imageID).Extract()
 		if err != nil {
 			return "", err
 		}
 		defer reader.Close()
-		f, err := os.Create(filepath.Join(dir, img.service.Name))
+		f, err := os.Create(filepath.Join(dir, img.service.Name+".raw"))
 		if err != nil {
 			return "", err
 		}
@@ -108,17 +92,10 @@ func (p *Platform) Download(snap Snapshot) (string, error) {
 }
 
 func (p *Platform) waitForImage(imageID string) error {
-	glance, err := openstack.NewImageServiceV2(p.client, gophercloud.EndpointOpts{
-		Availability: gophercloud.AvailabilityPublic,
-	})
-	if err != nil {
-		return err
-	}
-
 	const timeout = 1 * time.Minute
 	deadline := time.Now().Add(timeout)
 	for tries := 0; time.Now().Before(deadline); tries++ {
-		image, err := images.Get(glance, imageID).Extract()
+		image, err := images.Get(p.glance, imageID).Extract()
 		if err != nil {
 			return err
 		}

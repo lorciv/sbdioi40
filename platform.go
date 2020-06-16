@@ -14,7 +14,7 @@ import (
 // Connect connects to an OpenStack platform within the SBDIOI40 project by using
 // the given credentials.
 func Connect(url, user, pass string) (*Platform, error) {
-	osClient, err := openstack.AuthenticatedClient(gophercloud.AuthOptions{
+	client, err := openstack.AuthenticatedClient(gophercloud.AuthOptions{
 		IdentityEndpoint: url,
 		Username:         user,
 		Password:         pass,
@@ -25,29 +25,44 @@ func Connect(url, user, pass string) (*Platform, error) {
 		return nil, err
 	}
 
-	return &Platform{client: osClient}, nil
+	opts := gophercloud.EndpointOpts{
+		Availability: gophercloud.AvailabilityPublic,
+	}
+	neutron, err := openstack.NewNetworkV2(client, opts)
+	if err != nil {
+		return nil, err
+	}
+	nova, err := openstack.NewComputeV2(client, opts)
+	if err != nil {
+		return nil, err
+	}
+	glance, err := openstack.NewImageServiceV2(client, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Platform{
+		neutron: neutron,
+		nova:    nova,
+		glance:  glance,
+	}, nil
 }
 
 // Platform represents an established connection to an OpenStack platform within
 // the sbdioi40 project.
 type Platform struct {
-	client *gophercloud.ProviderClient
+	neutron *gophercloud.ServiceClient
+	nova    *gophercloud.ServiceClient
+	glance  *gophercloud.ServiceClient
 }
 
 func (p *Platform) String() string {
-	return "platform " + p.client.IdentityBase
+	return "platform " + p.neutron.IdentityBase
 }
 
 // ListApplications lists the sbdioi40 applications currently hosted by the platform.
 func (p *Platform) ListApplications() ([]Application, error) {
-	neutron, err := openstack.NewNetworkV2(p.client, gophercloud.EndpointOpts{
-		Availability: gophercloud.AvailabilityPublic,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	page, err := networks.List(neutron, nil).AllPages()
+	page, err := networks.List(p.neutron, nil).AllPages()
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +79,7 @@ func (p *Platform) ListApplications() ([]Application, error) {
 			networkID: net.ID,
 		}
 
-		page, err := ports.List(neutron, ports.ListOpts{
+		page, err := ports.List(p.neutron, ports.ListOpts{
 			NetworkID: application.networkID,
 		}).AllPages()
 		if err != nil {
@@ -95,22 +110,15 @@ func (p *Platform) ListApplications() ([]Application, error) {
 
 // Application gets information about a specific application hosted by the platform.
 func (p *Platform) Application(name string) (Application, error) {
-	neutron, err := openstack.NewNetworkV2(p.client, gophercloud.EndpointOpts{
-		Availability: gophercloud.AvailabilityPublic,
-	})
-	if err != nil {
-		return Application{}, fmt.Errorf("neutron connection failed: %v", err)
-	}
-
 	// get the network
 	netName := name + "net"
-	netID, err := networkutils.IDFromName(neutron, netName)
+	netID, err := networkutils.IDFromName(p.neutron, netName)
 	if err != nil {
 		return Application{}, fmt.Errorf("application %s does not exist", name)
 	}
 
 	// get the ports
-	page, err := ports.List(neutron, ports.ListOpts{
+	page, err := ports.List(p.neutron, ports.ListOpts{
 		NetworkID: netID,
 	}).AllPages()
 	if err != nil {
