@@ -24,7 +24,7 @@ type Snapshot struct {
 
 func (s Snapshot) String() string {
 	timefmt := "2006-01-02 15:04:05.00000"
-	return fmt.Sprintf("snapshot of %s (%s) in %s", s.App.Name, s.CreatedAt.Format(timefmt), s.Dir)
+	return fmt.Sprintf("snapshot of app %s (%s) in %s", s.App.Name, s.CreatedAt.Format(timefmt), s.Dir)
 }
 
 // SnapshotFile is a snapshot of a single service belonging to a sbdioi40 application.
@@ -99,7 +99,7 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 
 		// TODO: remove the snapshot image from the OpenStack platform
 
-		log.Printf("snapshot of %s completed (%d bytes)", serv.Name, written)
+		log.Printf("service snapshot of %s completed (%d bytes)", serv.Name, written)
 	}
 
 	return snap, nil
@@ -118,7 +118,7 @@ func (p *Platform) waitForImage(imageID string) error {
 		}
 
 		log.Printf("image %s not ready; retrying...", image.Name)
-		time.Sleep(time.Second << uint(tries))
+		time.Sleep(time.Second << uint(tries)) // exponential back-off
 	}
 
 	return fmt.Errorf("image %s not ready after %s; giving up", imageID, timeout)
