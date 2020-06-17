@@ -74,32 +74,9 @@ func (p *Platform) ListApplications() ([]Application, error) {
 	var applications []Application
 
 	for _, net := range allNets {
-		application := Application{
-			Name:      strings.TrimSuffix(net.Name, "net"),
-			networkID: net.ID,
-		}
-
-		page, err := ports.List(p.neutron, ports.ListOpts{
-			NetworkID: application.networkID,
-		}).AllPages()
+		application, err := p.Application(strings.TrimSuffix(net.Name, "net"))
 		if err != nil {
 			return nil, err
-		}
-		allPorts, err := ports.ExtractPorts(page)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, port := range allPorts {
-			if port.DeviceOwner != "compute:nova" {
-				// skip non-vm ports (such as dhcp)
-				continue
-			}
-			application.Services = append(application.Services, Service{
-				Name:     trimPrefixSuffix(port.Name, application.Name, "port"),
-				portID:   port.ID,
-				serverID: port.DeviceID,
-			})
 		}
 
 		applications = append(applications, application)
@@ -138,6 +115,7 @@ func (p *Platform) Application(name string) (Application, error) {
 			// skip non-vm ports (such as dhcp)
 			continue
 		}
+
 		app.Services = append(app.Services, Service{
 			Name:     trimPrefixSuffix(port.Name, app.Name, "port"),
 			portID:   port.ID,

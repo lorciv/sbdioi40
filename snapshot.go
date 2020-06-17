@@ -58,31 +58,31 @@ func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
 	return snap, nil
 }
 
-// Download downlads a snapshot to the local storage. It returns the location of
+// DownloadSnapshot downlads a snapshot to the local storage. It returns the location of
 // the temporary directory where the data can be found.
-func (p *Platform) Download(snap Snapshot) (string, error) {
-	dir, err := ioutil.TempDir("", "sbdioi40-snap-"+snap.App.Name)
+func (p *Platform) DownloadSnapshot(snap Snapshot) (dir string, err error) {
+	dir, err = ioutil.TempDir("", "sbdioi40-snap-"+snap.App.Name)
 	if err != nil {
 		return "", err
 	}
 
 	for _, img := range snap.images {
 		if err := p.waitForImage(img.imageID); err != nil {
-			return "", err
+			return dir, err
 		}
 
 		reader, err := imagedata.Download(p.glance, img.imageID).Extract()
 		if err != nil {
-			return "", err
+			return dir, err
 		}
 		defer reader.Close()
 		f, err := os.Create(filepath.Join(dir, img.service.Name+".raw"))
 		if err != nil {
-			return "", err
+			return dir, err
 		}
 		written, err := io.Copy(f, reader)
 		if err != nil {
-			return "", err
+			return dir, err
 		}
 
 		log.Printf("snapshot of %s completed (%d bytes)", img.service.Name, written)

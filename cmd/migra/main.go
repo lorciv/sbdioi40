@@ -39,18 +39,4 @@ func main() {
 	}
 
 	log.Print(app)
-
-	snap, err := plat.Snapshot(&app)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Print(snap)
-
-	dir, err := plat.Download(snap)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Print(snap, " saved in ", dir)
 }
