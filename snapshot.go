@@ -14,16 +14,25 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 )
 
-// Snapshot is a remote snapshot of a sbdioi40 application.
+// Snapshot is a snapshot of a sbdioi40 application.
 type Snapshot struct {
 	App       *Application
-	Dir       string
+	Dir       string // TODO: remove
 	CreatedAt time.Time
+	Files     []SnapshotFile
 }
 
 func (s Snapshot) String() string {
 	timefmt := "2006-01-02 15:04:05.00000"
 	return fmt.Sprintf("snapshot of %s (%s) in %s", s.App.Name, s.CreatedAt.Format(timefmt), s.Dir)
+}
+
+// SnapshotFile is a snapshot of a single service belonging to a sbdioi40 application.
+type SnapshotFile struct {
+	Service         *Service
+	Path            string
+	DiskFormat      string
+	ContainerFormat string
 }
 
 // Snapshot creates a snapshot of the given application, downloads it to the
@@ -37,6 +46,12 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 	dir, err := ioutil.TempDir("", "sbdioi40-snap-"+appname)
 	if err != nil {
 		return Snapshot{}, err
+	}
+
+	snap := Snapshot{
+		App:       &app,
+		Dir:       dir,
+		CreatedAt: time.Now(),
 	}
 
 	for _, serv := range app.Services {
@@ -55,6 +70,11 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 			return Snapshot{}, err
 		}
 
+		image, err := images.Get(p.glance, imageID).Extract()
+		if err != nil {
+			return Snapshot{}, err
+		}
+
 		reader, err := imagedata.Download(p.glance, imageID).Extract()
 		if err != nil {
 			return Snapshot{}, err
@@ -64,21 +84,25 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 		if err != nil {
 			return Snapshot{}, err
 		}
+		defer f.Close()
 		written, err := io.Copy(f, reader)
 		if err != nil {
 			return Snapshot{}, err
 		}
 
-		// TODO: remove the snapshot image from the platform
+		snap.Files = append(snap.Files, SnapshotFile{
+			Service:         &serv,
+			Path:            f.Name(),
+			DiskFormat:      image.DiskFormat,
+			ContainerFormat: image.ContainerFormat,
+		})
+
+		// TODO: remove the snapshot image from the OpenStack platform
 
 		log.Printf("snapshot of %s completed (%d bytes)", serv.Name, written)
 	}
 
-	return Snapshot{
-		App:       &app,
-		Dir:       dir,
-		CreatedAt: time.Now(),
-	}, nil
+	return snap, nil
 }
 
 func (p *Platform) waitForImage(imageID string) error {
