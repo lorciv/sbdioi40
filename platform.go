@@ -22,7 +22,7 @@ func Connect(url, user, pass string) (*Platform, error) {
 		DomainName:       "Default",
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot connect to %s: %v", url, err)
 	}
 
 	opts := gophercloud.EndpointOpts{
@@ -30,15 +30,15 @@ func Connect(url, user, pass string) (*Platform, error) {
 	}
 	neutron, err := openstack.NewNetworkV2(client, opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot connect to %s: %v", url, err)
 	}
 	nova, err := openstack.NewComputeV2(client, opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot connect to %s: %v", url, err)
 	}
 	glance, err := openstack.NewImageServiceV2(client, opts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot connect to %s: %v", url, err)
 	}
 
 	return &Platform{
@@ -91,7 +91,7 @@ func (p *Platform) Application(name string) (Application, error) {
 	netName := name + "net"
 	netID, err := networkutils.IDFromName(p.neutron, netName)
 	if err != nil {
-		return Application{}, fmt.Errorf("application %s does not exist", name)
+		return Application{}, fmt.Errorf("cannot get application %s: %v", name, err)
 	}
 
 	// get the ports
@@ -99,11 +99,11 @@ func (p *Platform) Application(name string) (Application, error) {
 		NetworkID: netID,
 	}).AllPages()
 	if err != nil {
-		return Application{}, err
+		return Application{}, fmt.Errorf("cannot get application %s: %v", name, err)
 	}
 	allPorts, err := ports.ExtractPorts(page)
 	if err != nil {
-		return Application{}, err
+		return Application{}, fmt.Errorf("cannot get application %s: %v", name, err)
 	}
 
 	app := Application{

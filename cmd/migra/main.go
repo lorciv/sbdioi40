@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/lorciv/sbdioi40"
@@ -33,10 +34,10 @@ func main() {
 
 	log.Print(apps)
 
-	app, err := plat.Application("sacmi")
+	snap, err := plat.Snapshot("sacmi")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Print(app)
+	fmt.Printf("%+v\n", snap)
 }

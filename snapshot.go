@@ -17,29 +17,32 @@ import (
 // Snapshot is a remote snapshot of a sbdioi40 application.
 type Snapshot struct {
 	App       *Application
-	images    []serviceSnapshot
+	Dir       string
 	CreatedAt time.Time
 }
 
 func (s Snapshot) String() string {
-	return fmt.Sprintf("snapshot of %s (%s)", s.App.Name, s.CreatedAt.Format("2006-01-02 15:04:05.00000"))
+	timefmt := "2006-01-02 15:04:05.00000"
+	return fmt.Sprintf("snapshot of %s (%s) in %s", s.App.Name, s.CreatedAt.Format(timefmt), s.Dir)
 }
 
-type serviceSnapshot struct {
-	service *Service
-	imageID string
-}
+// Snapshot creates a snapshot of the given application, downloads it to the
+// local storage and returns a Snapshot object that holds information about it.
+func (p *Platform) Snapshot(appname string) (Snapshot, error) {
+	app, err := p.Application(appname)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("snapshot failed: %v", err)
+	}
 
-// Snapshot creates a snapshot of the given application and returns a Snapshot
-// object that holds information about it.
-func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
-	snap := Snapshot{
-		App:       app,
-		CreatedAt: time.Now(),
+	dir, err := ioutil.TempDir("", "sbdioi40-snap-"+appname)
+	if err != nil {
+		return Snapshot{}, err
 	}
 
 	for _, serv := range app.Services {
 		serv := serv // necessary: capture iteration variable
+
+		// TODO: snapshot and download in parallel
 
 		imageID, err := servers.CreateImage(p.nova, serv.serverID, servers.CreateImageOpts{
 			Name: app.Name + serv.Name + "snap",
@@ -47,48 +50,35 @@ func (p *Platform) Snapshot(app *Application) (Snapshot, error) {
 		if err != nil {
 			return Snapshot{}, err
 		}
-		log.Printf("snapshot %s done", serv.Name)
-
-		snap.images = append(snap.images, serviceSnapshot{
-			service: &serv,
-			imageID: imageID,
-		})
-	}
-
-	return snap, nil
-}
-
-// DownloadSnapshot downlads a snapshot to the local storage. It returns the location of
-// the temporary directory where the data can be found.
-func (p *Platform) DownloadSnapshot(snap Snapshot) (dir string, err error) {
-	dir, err = ioutil.TempDir("", "sbdioi40-snap-"+snap.App.Name)
-	if err != nil {
-		return "", err
-	}
-
-	for _, img := range snap.images {
-		if err := p.waitForImage(img.imageID); err != nil {
-			return dir, err
+		// TODO: try to call image create with "wait" option
+		if err := p.waitForImage(imageID); err != nil {
+			return Snapshot{}, err
 		}
 
-		reader, err := imagedata.Download(p.glance, img.imageID).Extract()
+		reader, err := imagedata.Download(p.glance, imageID).Extract()
 		if err != nil {
-			return dir, err
+			return Snapshot{}, err
 		}
 		defer reader.Close()
-		f, err := os.Create(filepath.Join(dir, img.service.Name+".raw"))
+		f, err := os.Create(filepath.Join(dir, serv.Name+".raw"))
 		if err != nil {
-			return dir, err
+			return Snapshot{}, err
 		}
 		written, err := io.Copy(f, reader)
 		if err != nil {
-			return dir, err
+			return Snapshot{}, err
 		}
 
-		log.Printf("snapshot of %s completed (%d bytes)", img.service.Name, written)
+		// TODO: remove the snapshot image from the platform
+
+		log.Printf("snapshot of %s completed (%d bytes)", serv.Name, written)
 	}
 
-	return dir, nil
+	return Snapshot{
+		App:       &app,
+		Dir:       dir,
+		CreatedAt: time.Now(),
+	}, nil
 }
 
 func (p *Platform) waitForImage(imageID string) error {
