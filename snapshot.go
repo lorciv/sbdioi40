@@ -14,12 +14,12 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 )
 
-// Snapshot is a snapshot of a sbdioi40 application.
+// Snapshot is a snapshot of a SBDIOI40 application.
 type Snapshot struct {
 	App       *Application
-	Dir       string // TODO: remove
+	Dir       string // TODO: may be no longer necessary
 	CreatedAt time.Time
-	Files     []SnapshotFile
+	Items     []ServiceSnapshot
 }
 
 func (s Snapshot) String() string {
@@ -27,16 +27,18 @@ func (s Snapshot) String() string {
 	return fmt.Sprintf("snapshot of app %s (%s) in %s", s.App.Name, s.CreatedAt.Format(timefmt), s.Dir)
 }
 
-// SnapshotFile is a snapshot of a single service belonging to a sbdioi40 application.
-type SnapshotFile struct {
+// ServiceSnapshot is a snapshot of a single service belonging to an application.
+// It corresponds to a raw file in the local storage.
+type ServiceSnapshot struct {
 	Service         *Service
 	Path            string
 	DiskFormat      string
 	ContainerFormat string
 }
 
-// Snapshot creates a snapshot of the given application, downloads it to the
-// local storage and returns a Snapshot object that holds information about it.
+// Snapshot creates a snapshot of the named application and returns an object
+// that holds information about it. The data is downloaded from the platform
+// and stored locally.
 func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 	app, err := p.Application(appname)
 	if err != nil {
@@ -57,7 +59,7 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 	for _, serv := range app.Services {
 		serv := serv // necessary: capture iteration variable
 
-		// TODO: snapshot and download in parallel
+		// TODO: snapshot and download each service concurrently
 
 		imageID, err := servers.CreateImage(p.nova, serv.serverID, servers.CreateImageOpts{
 			Name: app.Name + serv.Name + "snap",
@@ -65,7 +67,7 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 		if err != nil {
 			return Snapshot{}, err
 		}
-		// TODO: try to call image create with "wait" option
+		// TODO: try to call image create with "wait" option instead
 		if err := p.waitForImage(imageID); err != nil {
 			return Snapshot{}, err
 		}
@@ -90,14 +92,14 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 			return Snapshot{}, err
 		}
 
-		snap.Files = append(snap.Files, SnapshotFile{
+		snap.Items = append(snap.Items, ServiceSnapshot{
 			Service:         &serv,
 			Path:            f.Name(),
 			DiskFormat:      image.DiskFormat,
 			ContainerFormat: image.ContainerFormat,
 		})
 
-		// TODO: remove the snapshot image from the OpenStack platform
+		// TODO: remove the service snapshot image from the OpenStack platform
 
 		log.Printf("service snapshot of %s completed (%d bytes)", serv.Name, written)
 	}
@@ -117,7 +119,7 @@ func (p *Platform) waitForImage(imageID string) error {
 			return nil // success
 		}
 
-		log.Printf("image %s not ready; retrying...", image.Name)
+		log.Printf("image %s not ready; waiting...", image.Name)
 		time.Sleep(time.Second << uint(tries)) // exponential back-off
 	}
 

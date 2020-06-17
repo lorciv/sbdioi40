@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Application holds information about a sbdioi40 application.
+// Application holds information about a SBDIOI40 application.
 type Application struct {
 	Name      string
 	networkID string

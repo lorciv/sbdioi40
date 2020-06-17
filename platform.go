@@ -49,7 +49,7 @@ func Connect(url, user, pass string) (*Platform, error) {
 }
 
 // Platform represents an established connection to an OpenStack platform within
-// the sbdioi40 project.
+// the SBDIOI40 project.
 type Platform struct {
 	neutron *gophercloud.ServiceClient
 	nova    *gophercloud.ServiceClient
@@ -60,7 +60,8 @@ func (p *Platform) String() string {
 	return "platform " + p.neutron.IdentityBase
 }
 
-// ListApplications lists the sbdioi40 applications currently hosted by the platform.
+// ListApplications lists all the SBDIOI40 applications that are hosted by the given
+// platform.
 func (p *Platform) ListApplications() ([]Application, error) {
 	page, err := networks.List(p.neutron, nil).AllPages()
 	if err != nil {
@@ -85,7 +86,8 @@ func (p *Platform) ListApplications() ([]Application, error) {
 	return applications, nil
 }
 
-// Application gets information about a specific application hosted by the platform.
+// Application gets information about the named application currently hosted by
+// the platform.
 func (p *Platform) Application(name string) (Application, error) {
 	// get the network
 	netName := name + "net"
