@@ -98,7 +98,8 @@ func (p *Platform) Application(name string) (Application, error) {
 
 	// get the ports
 	page, err := ports.List(p.neutron, ports.ListOpts{
-		NetworkID: netID,
+		NetworkID:   netID,
+		DeviceOwner: "compute:nova", // skip non-vm ports (such as dhcp)
 	}).AllPages()
 	if err != nil {
 		return Application{}, fmt.Errorf("cannot get application %s: %v", name, err)
@@ -113,11 +114,6 @@ func (p *Platform) Application(name string) (Application, error) {
 		networkID: netID,
 	}
 	for _, port := range allPorts {
-		if port.DeviceOwner != "compute:nova" {
-			// skip non-vm ports (such as dhcp)
-			continue
-		}
-
 		app.Services = append(app.Services, Service{
 			Name:     trimPrefixSuffix(port.Name, app.Name, "port"),
 			portID:   port.ID,
