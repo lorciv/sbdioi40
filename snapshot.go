@@ -91,15 +91,17 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 			return Snapshot{}, err
 		}
 
+		log.Printf("service snapshot of %s completed (%d bytes)", serv.Name, written)
+
+		if err := images.Delete(p.glance, imageID).ExtractErr(); err != nil {
+			log.Printf("image delete failed: %v; snapshot is still on the source platform", err)
+		}
+
 		snap.Items = append(snap.Items, ServiceSnapshot{
 			Service: &serv,
 			Path:    f.Name(),
 			image:   *image,
 		})
-
-		// TODO: remove the service snapshot image from the OpenStack platform
-
-		log.Printf("service snapshot of %s completed (%d bytes)", serv.Name, written)
 	}
 
 	return snap, nil
@@ -108,6 +110,7 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 func (p *Platform) waitForImage(imageID string) error {
 	const timeout = 1 * time.Minute
 	deadline := time.Now().Add(timeout)
+
 	for tries := 0; time.Now().Before(deadline); tries++ {
 		image, err := images.Get(p.glance, imageID).Extract()
 		if err != nil {

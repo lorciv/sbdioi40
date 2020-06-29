@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
@@ -88,7 +89,7 @@ func (p *Platform) Restore(snap Snapshot) error {
 			return fmt.Errorf("restoring port for service %s: %v", snapItem.Service.Name, err)
 		}
 
-		_, err = servers.Create(p.nova, servers.CreateOpts{
+		server, err := servers.Create(p.nova, servers.CreateOpts{
 			Name:     snap.App.Name + snapItem.Service.Name + "vm",
 			ImageRef: image.ID,
 			Networks: []servers.Network{
@@ -101,8 +102,43 @@ func (p *Platform) Restore(snap Snapshot) error {
 			return fmt.Errorf("restoring %s: %v", snap.App.Name, err)
 		}
 
+		// wait for server start-up before removing its image
+		if err := p.waitForServer(server.ID); err != nil {
+			log.Printf("%v; won't remove snapshot from the platform", err)
+		}
+
 		log.Printf("restored service %s", snapItem.Service.Name)
+
+		if err := images.Delete(p.glance, image.ID).ExtractErr(); err != nil {
+			log.Printf("snapshot delete failed: %v; still on the platform", err)
+		}
 	}
 
 	return nil
+}
+
+func (p *Platform) waitForServer(serverID string) error {
+	var serverName string
+
+	const timeout = 1 * time.Minute
+	deadline := time.Now().Add(timeout)
+
+	for tries := 0; time.Now().Before(deadline); tries++ {
+		server, err := servers.Get(p.nova, serverID).Extract()
+		if err != nil {
+			return err
+		}
+		if serverName == "" {
+			serverName = server.Name
+		}
+
+		if server.Status == "ACTIVE" {
+			return nil // success
+		}
+
+		log.Printf("server %s not active yet; waiting...", serverName)
+		time.Sleep(time.Second << uint(tries)) // exponential back-off
+	}
+
+	return fmt.Errorf("server %s not active after %s; giving up", serverName, timeout)
 }
