@@ -30,10 +30,9 @@ func (s Snapshot) String() string {
 // ServiceSnapshot is a snapshot of a single service belonging to an application.
 // It corresponds to a raw file in the local storage.
 type ServiceSnapshot struct {
-	Service         *Service
-	Path            string
-	DiskFormat      string
-	ContainerFormat string
+	Service *Service
+	Path    string
+	image   images.Image
 }
 
 // Snapshot creates a snapshot of the named application and returns an object
@@ -61,7 +60,7 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 
 		// TODO: snapshot and download each service concurrently
 
-		imageID, err := servers.CreateImage(p.nova, serv.serverID, servers.CreateImageOpts{
+		imageID, err := servers.CreateImage(p.nova, serv.server.ID, servers.CreateImageOpts{
 			Name: app.Name + serv.Name + "snap",
 		}).ExtractImageID()
 		if err != nil {
@@ -93,10 +92,9 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 		}
 
 		snap.Items = append(snap.Items, ServiceSnapshot{
-			Service:         &serv,
-			Path:            f.Name(),
-			DiskFormat:      image.DiskFormat,
-			ContainerFormat: image.ContainerFormat,
+			Service: &serv,
+			Path:    f.Name(),
+			image:   *image,
 		})
 
 		// TODO: remove the service snapshot image from the OpenStack platform
