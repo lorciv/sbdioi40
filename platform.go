@@ -5,11 +5,15 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 )
 
 // Platform represents an established connection to an OpenStack platform within
 // the SBDIOI40 project.
 type Platform struct {
+	project  projects.Project
+	router   routers.Router
 	keystone *gophercloud.ServiceClient
 	neutron  *gophercloud.ServiceClient
 	nova     *gophercloud.ServiceClient
@@ -30,6 +34,7 @@ func Connect(url, user, pass string) (*Platform, error) {
 		return nil, fmt.Errorf("cannot connect to %s: %v", url, err)
 	}
 
+	// connect to the essential OpenStack services
 	opts := gophercloud.EndpointOpts{
 		Availability: gophercloud.AvailabilityPublic,
 	}
@@ -50,7 +55,35 @@ func Connect(url, user, pass string) (*Platform, error) {
 		return nil, fmt.Errorf("cannot connect to %s: %v", url, err)
 	}
 
+	// get project-level information
+	page, err := projects.List(keystone, projects.ListOpts{
+		Name: "sbdioi40",
+	}).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("cannot find project %q: %v", "sbdioi40", err)
+	}
+	allProjects, err := projects.ExtractProjects(page)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find project %q: %v", "sbdioi40", err)
+	}
+	project := allProjects[0]
+
+	page, err = routers.List(neutron, routers.ListOpts{
+		Name:      "router",
+		ProjectID: project.ID,
+	}).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("cannot find router: %v", err)
+	}
+	allRouters, err := routers.ExtractRouters(page)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find router: %v", err)
+	}
+	router := allRouters[0]
+
 	return &Platform{
+		project:  project,
+		router:   router,
 		keystone: keystone,
 		neutron:  neutron,
 		nova:     nova,

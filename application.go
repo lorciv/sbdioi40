@@ -14,9 +14,9 @@ import (
 // Application holds information about a SBDIOI40 application.
 type Application struct {
 	Name     string
+	Services []Service
 	network  networks.Network
 	subnet   subnets.Subnet
-	Services []Service
 }
 
 // Network returns the network address for the given application. The address is

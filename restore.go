@@ -8,6 +8,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imagedata"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
@@ -20,12 +21,14 @@ import (
 // TODO: Restore expects to find the m1.tiny flavor and the default security group.
 // It should recreate them as well, if they are missing.
 func (p *Platform) Restore(snap Snapshot) error {
+	// recreate the network and the subnet, and connect it to the router
 	network, err := networks.Create(p.neutron, networks.CreateOpts{
 		Name: snap.App.network.Name,
 	}).Extract()
 	if err != nil {
 		return fmt.Errorf("restoring network for %s: %v", snap.App.Name, err)
 	}
+
 	subnet, err := subnets.Create(p.neutron, subnets.CreateOpts{
 		Name:           snap.App.Name + "subnet",
 		NetworkID:      network.ID,
@@ -35,6 +38,13 @@ func (p *Platform) Restore(snap Snapshot) error {
 	}).Extract()
 	if err != nil {
 		return fmt.Errorf("restoring subnet for %s: %v", snap.App.Name, err)
+	}
+
+	_, err = routers.AddInterface(p.neutron, p.router.ID, routers.AddInterfaceOpts{
+		SubnetID: subnet.ID,
+	}).Extract()
+	if err != nil {
+		return fmt.Errorf("connecting network to router for %s: %v", snap.App.Name, err)
 	}
 
 	for _, snapItem := range snap.Items {
