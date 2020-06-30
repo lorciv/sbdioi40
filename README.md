@@ -27,14 +27,22 @@ First, you should connect to a platform. The package exposes a function `Connect
 
 ```go
 plat, err := sbdioi40.Connect("addr", "user", "password")
-if err != nil {
-    log.Fatal(err)
-}
+// err handling...
 ```
 
 `Platform` objects are central to the usage of the library because it exposes methods with which you can manage your applications.
 
-The method `ListApplications` lets you retrieve information about all the applications that are currently hosted on the given platform. `Application` retrieves information about one specific application, given its name.
+The method `ListApplications` lets you retrieve information about all the applications that are currently hosted on the given platform. `Application` retrieves information about one specific application, given its name. For example, to print the name of all the applications that are running on a platform:
+
+```go
+apps, err := plat.ListApplications()
+// err handling...
+for _, a := range apps {
+    fmt.Println(a.Name)
+}
+```
+
+If you want to remove an application, the method `Remove` can be used.
 
 ## Migration
 
@@ -44,17 +52,14 @@ With the method `Snapshot` you can take a snapshot of an application and downloa
 
 ```go
 snap, err := srcPlat.Snapshot("appname")
-if err != nil {
-    log.Fatal(err)
-}
+// err handling...
 ```
 
 Once a snapshot has been taken, you can implement the migration by restoring it to a different platform. To restore a snapshot, the platform object exposes a method `Restore` that takes a snapshot as input and rebuilds the application in the given platform.
 
 ```go
-if err := dstPlat.Restore(snap); err != nil {
-    log.Fatal(err)
-}
+err := dstPlat.Restore(snap)
+// err handling...
 ```
 
 As a result, the application has successfully moved between two different platforms.
