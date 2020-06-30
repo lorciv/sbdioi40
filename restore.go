@@ -1,6 +1,7 @@
 package sbdioi40
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -21,7 +22,10 @@ import (
 //
 // TODO: Restore expects to find the m1.tiny flavor and the default security group.
 // It should recreate them as well, if they are missing.
-func (p *Platform) Restore(snap Snapshot) error {
+func (p *Platform) Restore(snap *Snapshot) error {
+	if !snap.Available() {
+		return errors.New("snapshot is not available")
+	}
 	// recreate the network and the subnet, and connect it to the router
 	network, err := networks.Create(p.neutron, networks.CreateOpts{
 		Name: snap.App.network.Name,

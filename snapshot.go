@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -17,14 +16,36 @@ import (
 // Snapshot is a snapshot of a SBDIOI40 application.
 type Snapshot struct {
 	App       *Application
-	Dir       string // TODO: may be no longer necessary
 	CreatedAt time.Time
 	Items     []ServiceSnapshot
 }
 
-func (s Snapshot) String() string {
+// Available checks whether the given shapshot is available in the local storage. Only available
+// snapshots may be restored.
+func (s *Snapshot) Available() bool {
+	for _, item := range s.Items {
+		if item.Path == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// Remove removes the given shapshot from the local storage. Once a snapshot is removed, it can
+// no longer be restored. Any attempt to restore a removed snapshot will fail.
+func (s *Snapshot) Remove() error {
+	for _, item := range s.Items {
+		if err := os.Remove(item.Path); err != nil {
+			return err
+		}
+	}
+	log.Printf("%s snapshot removed from local storage", s.App.Name)
+	return nil
+}
+
+func (s *Snapshot) String() string {
 	timefmt := "2006-01-02 15:04:05.00000"
-	return fmt.Sprintf("snapshot of app %s (%s) in %s", s.App.Name, s.CreatedAt.Format(timefmt), s.Dir)
+	return fmt.Sprintf("snapshot of app %s (%s)", s.App.Name, s.CreatedAt.Format(timefmt))
 }
 
 // ServiceSnapshot is a snapshot of a single service belonging to an application.
@@ -38,20 +59,15 @@ type ServiceSnapshot struct {
 // Snapshot creates a snapshot of the named application and returns an object
 // that holds information about it. The data is downloaded from the platform
 // and stored locally.
-func (p *Platform) Snapshot(appname string) (Snapshot, error) {
+func (p *Platform) Snapshot(appname string) (*Snapshot, error) {
 	app, err := p.Application(appname)
 	if err != nil {
-		return Snapshot{}, fmt.Errorf("snapshot failed: %v", err)
+		return nil, fmt.Errorf("snapshot failed: %v", err)
 	}
+	log.Printf("found %s", app)
 
-	dir, err := ioutil.TempDir("", "sbdioi40-snap-"+appname)
-	if err != nil {
-		return Snapshot{}, err
-	}
-
-	snap := Snapshot{
+	snap := &Snapshot{
 		App:       &app,
-		Dir:       dir,
 		CreatedAt: time.Now(),
 	}
 
@@ -64,31 +80,32 @@ func (p *Platform) Snapshot(appname string) (Snapshot, error) {
 			Name: app.Name + serv.Name + "snap",
 		}).ExtractImageID()
 		if err != nil {
-			return Snapshot{}, err
+			return nil, err
 		}
 		// TODO: try to call image create with "wait" option instead
 		if err := p.waitForImage(imageID); err != nil {
-			return Snapshot{}, err
+			return nil, err
 		}
 
 		image, err := images.Get(p.glance, imageID).Extract()
 		if err != nil {
-			return Snapshot{}, err
+			return nil, err
 		}
 
 		reader, err := imagedata.Download(p.glance, imageID).Extract()
 		if err != nil {
-			return Snapshot{}, err
+			return nil, err
 		}
 		defer reader.Close()
-		f, err := os.Create(filepath.Join(dir, serv.Name+".raw"))
+
+		f, err := ioutil.TempFile("", "sbdioi40-"+image.Name)
 		if err != nil {
-			return Snapshot{}, err
+			return nil, err
 		}
 		defer f.Close()
 		written, err := io.Copy(f, reader)
 		if err != nil {
-			return Snapshot{}, err
+			return nil, err
 		}
 
 		log.Printf("service snapshot of %s completed (%d bytes)", serv.Name, written)

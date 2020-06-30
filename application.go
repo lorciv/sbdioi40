@@ -44,6 +44,7 @@ type Service struct {
 	server servers.Server
 }
 
+// IPAddr returns the IP address for the application's virtual network.
 func (s Service) IPAddr() string {
 	if len(s.port.FixedIPs) == 0 {
 		panic("service with no associated IP address")

@@ -17,6 +17,7 @@ var dstAddr = flag.String("dst", "", "Address to the destination OpenStack platf
 var username = flag.String("user", "", "Username for authentication on both platforms")
 var password = flag.String("pass", "", "Password for authentication on both platforms")
 var appname = flag.String("app", "", "Name of the application to migrate")
+var clean = flag.Bool("clean", true, "Remove temporary files from local storage after migration")
 
 func main() {
 	flag.Parse()
@@ -39,6 +40,10 @@ func main() {
 
 	if err := dstPlat.Restore(snap); err != nil {
 		log.Fatal(err)
+	}
+
+	if *clean {
+		snap.Remove()
 	}
 
 	log.Print("done")
