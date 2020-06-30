@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
@@ -59,7 +60,11 @@ func (s Service) String() string {
 // ListApplications lists all the SBDIOI40 applications that are hosted by the given
 // platform.
 func (p *Platform) ListApplications() ([]Application, error) {
-	page, err := networks.List(p.neutron, nil).AllPages()
+	iFalse := false
+	page, err := networks.List(p.neutron, external.ListOptsExt{
+		ListOptsBuilder: networks.ListOpts{},
+		External:        &iFalse, // exclude external networks when looking for apps
+	}).AllPages()
 	if err != nil {
 		return nil, err
 	}

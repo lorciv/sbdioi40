@@ -19,7 +19,7 @@ Some conventions must be respected when configuring a new application. Given an 
 
 Also, all applications must live in a project called "sbdioi40".
 
-If all these preconditions are met, the package will be able to identify applications and manage them.
+If all these preconditions are met, the package will be able to identify applications and manage them successfully.
 
 ## Basic usage
 
@@ -59,4 +59,6 @@ if err := dstPlat.Restore(snap); err != nil {
 
 As a result, the application has successfully moved between two different platforms.
 
-For more information, refer to the deliverable for the SBDIOI40 project. (link coming soon)
+## Further information
+
+For more details, you can refer to the deliverable for the SBDIOI40 project. (link coming soon)
